@@ -1,0 +1,200 @@
+package com.example.departmentproject
+
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditDeleteRoomScreen(navController: NavHostController, viewModel: RoomViewModel) {
+    val context = LocalContext.current
+    val sharedPrefs = SharedPreferencesManager(context)
+    val userId = sharedPrefs.getSavedStdId().toIntOrNull() ?: 0
+
+    val statusOptions = listOf("ว่าง", "ไม่ว่าง")
+
+    // Dropdown States
+    var buildingExpanded by remember { mutableStateOf(false) }
+    var roomTypeExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(userId) {
+        if (userId != 0) {
+            viewModel.initializeOwner(userId) { ownerId ->
+                viewModel.fetchBuildingsAndRoomTypes(ownerId)
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("แก้ไขข้อมูลห้องพัก", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("Owner ID: ${viewModel.ownerId}", fontSize = 12.sp, color = Color.Gray)
+            Text(text = "รหัสห้อง: ${viewModel.roomIdText}", fontSize = 14.sp, color = Color.Gray)
+
+            OutlinedTextField(
+                value = viewModel.pictureUrlText,
+                onValueChange = { viewModel.pictureUrlText = it },
+                label = { Text("URL รูปภาพห้องพัก") },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("ใส่ลิงก์รูปภาพ เช่น https://...") }
+            )
+
+            if (viewModel.pictureUrlText.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFE0E0E0)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("ตัวอย่างรูปภาพจาก URL", color = Color.Gray)
+                }
+            }
+
+            OutlinedTextField(
+                value = viewModel.roomNumberText,
+                onValueChange = { viewModel.roomNumberText = it },
+                label = { Text("เลขห้อง") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Building Dropdown
+            ExposedDropdownMenuBox(
+                expanded = buildingExpanded,
+                onExpandedChange = { buildingExpanded = !buildingExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val selectedBuilding = viewModel.buildings.find { it.building_id == viewModel.selectedBuildingId }
+                OutlinedTextField(
+                    value = selectedBuilding?.building_name ?: "เลือกอาคาร",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("อาคาร") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = buildingExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = buildingExpanded,
+                    onDismissRequest = { buildingExpanded = false }
+                ) {
+                    viewModel.buildings.forEach { building ->
+                        DropdownMenuItem(
+                            text = { Text(building.building_name) },
+                            onClick = {
+                                viewModel.selectedBuildingId = building.building_id
+                                buildingExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Room Type Dropdown
+            ExposedDropdownMenuBox(
+                expanded = roomTypeExpanded,
+                onExpandedChange = { roomTypeExpanded = !roomTypeExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val selectedType = viewModel.roomTypes.find { it.room_type_id == viewModel.selectedRoomTypeId }
+                OutlinedTextField(
+                    value = selectedType?.type_name ?: "เลือกประเภทห้อง",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("ประเภทห้อง") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = roomTypeExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = roomTypeExpanded,
+                    onDismissRequest = { roomTypeExpanded = false }
+                ) {
+                    viewModel.roomTypes.forEach { type ->
+                        DropdownMenuItem(
+                            text = { Text("${type.type_name} (${type.price} บาท)") },
+                            onClick = {
+                                viewModel.selectedRoomTypeId = type.room_type_id
+                                roomTypeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                statusOptions.forEach { status ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { viewModel.statusText = status }) {
+                        RadioButton(selected = viewModel.statusText == status, onClick = { viewModel.statusText = status })
+                        Text(status)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    if (viewModel.roomNumberText.isBlank() || viewModel.selectedBuildingId == 0 || viewModel.selectedRoomTypeId == 0) {
+                        Toast.makeText(context, "กรุณากรอกข้อมูลให้ครบถ้วน", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    viewModel.updateRoom(context, viewModel.ownerId) {
+                        navController.popBackStack()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7E8CE0))
+            ) {
+                Text("บันทึกการแก้ไข", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+
+            Button(
+                onClick = {
+                    viewModel.deleteRoom(context, viewModel.roomIdText.toIntOrNull() ?: 0, viewModel.ownerId) {
+                        navController.popBackStack()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEBEE))
+            ) {
+                Text("ลบห้องพัก", color = Color.Red, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
