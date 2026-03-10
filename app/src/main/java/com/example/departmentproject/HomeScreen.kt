@@ -31,7 +31,6 @@ import androidx.navigation.NavHostController
 import java.text.NumberFormat
 import java.util.Locale
 
-// ── สี ────────────────────────────────────────
 private val Purple      = Color(0xFF6B6FD4)
 private val GradEnd     = Color(0xFF8E92E3)
 private val GreenText   = Color(0xFF0BAB72)
@@ -67,9 +66,7 @@ fun HomeScreen(
 
     Scaffold(
         containerColor = BgGray,
-        bottomBar = {
-            AdminBottomBar(navController)
-        }
+        bottomBar = { AdminBottomBar(navController) }
     ) { innerPadding ->
 
         LazyColumn(
@@ -88,17 +85,13 @@ fun HomeScreen(
                 OutlinedTextField(
                     value         = search,
                     onValueChange = { search = it },
-                    placeholder   = {
-                        Text("ค้นหาห้องพัก...", color = TextSub, fontSize = 14.sp)
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, null, tint = TextSub)
-                    },
-                    singleLine  = true,
-                    shape       = RoundedCornerShape(12.dp),
-                    modifier    = Modifier.fillMaxWidth(),
+                    placeholder   = { Text("ค้นหาห้องพัก...", color = TextSub, fontSize = 14.sp) },
+                    leadingIcon   = { Icon(Icons.Default.Search, null, tint = TextSub) },
+                    singleLine    = true,
+                    shape         = RoundedCornerShape(12.dp),
+                    modifier      = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    colors      = OutlinedTextFieldDefaults.colors(
+                    colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor      = Purple,
                         unfocusedBorderColor    = Color.Transparent,
                         focusedContainerColor   = White,
@@ -113,22 +106,16 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            Brush.horizontalGradient(listOf(Purple, GradEnd))
-                        )
+                        .background(Brush.horizontalGradient(listOf(Purple, GradEnd)))
                         .padding(horizontal = 20.dp, vertical = 18.dp)
                 ) {
                     Column {
+                        // ✅ รวม amount (ค่าน้ำ+ไฟ) + roomPrice (ค่าห้อง)
                         val totalPaidThisMonth = viewModel.dashboardData?.recentPayments
                             ?.filter { it.status == "ชำระแล้ว" }
-                            ?.sumOf { it.amount } ?: 0.0
+                            ?.sumOf { it.amount + it.roomPrice } ?: 0.0
 
-                        Text(
-                            "ยอดรวมเดือนนี้",
-                            color = Color(0xFFCDD0F0),
-                            fontSize = 13.sp
-                        )
-
+                        Text("ยอดรวมเดือนนี้", color = Color(0xFFCDD0F0), fontSize = 13.sp)
                         Spacer(Modifier.height(6.dp))
 
                         if (viewModel.isLoading) {
@@ -144,11 +131,9 @@ fun HomeScreen(
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Bold
                             )
-
                             Spacer(Modifier.height(4.dp))
-
                             Text(
-                                "เฉพาะบิลที่ชำระแล้ว",
+                                "ค่าห้อง + ค่าน้ำ + ค่าไฟ (เฉพาะชำระแล้ว)",
                                 color = Color(0xFFCDD0F0),
                                 fontSize = 12.sp
                             )
@@ -160,25 +145,16 @@ fun HomeScreen(
             // ── Section Header ─────────────────────────
             item {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "รายการล่าสุด",
-                        fontWeight = FontWeight.Bold,
-                        fontSize   = 17.sp,
-                        color      = TextMain
-                    )
+                    Text("รายการล่าสุด", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = TextMain)
                     Text(
                         "ดูทั้งหมด",
                         color    = Purple,
                         fontSize = 14.sp,
-                        modifier = Modifier.clickable {
-                            navController.navigate("bills")
-                        }
+                        modifier = Modifier.clickable { navController.navigate("bills") }
                     )
                 }
             }
@@ -199,11 +175,7 @@ fun HomeScreen(
                         shape  = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = White)
                     ) {
-                        Text(
-                            msg,
-                            modifier = Modifier.padding(16.dp),
-                            color    = Color.Red
-                        )
+                        Text(msg, modifier = Modifier.padding(16.dp), color = Color.Red)
                     }
                 }
             }
@@ -217,14 +189,9 @@ fun HomeScreen(
 
             items(bills) { bill ->
                 BillCard(
-                    bill    = bill,
-                    // ✅ แก้ไข: กดตรวจสอบ → navigate ไปหน้า detail เพื่อดูสลิปก่อน
-                    onInspect = {
-                        navController.navigate("bill_detail/${bill.billId}")
-                    },
-                    onDetail  = {
-                        navController.navigate("bill_detail/${bill.billId}")
-                    }
+                    bill      = bill,
+                    onInspect = { navController.navigate("bill_detail/${bill.billId}") },
+                    onDetail  = { navController.navigate("bill_detail/${bill.billId}") }
                 )
             }
         }
@@ -240,6 +207,9 @@ private fun BillCard(
     onInspect: () -> Unit,
     onDetail:  () -> Unit
 ) {
+    // ✅ รวมค่าห้อง + ค่าน้ำ + ค่าไฟ
+    val totalAmount = bill.amount + bill.roomPrice
+
     Card(
         modifier  = Modifier.fillMaxWidth(),
         shape     = RoundedCornerShape(14.dp),
@@ -258,25 +228,33 @@ private fun BillCard(
                 color      = TextMain
             )
 
+            // ✅ แสดงยอดรวมทั้งหมด
             Text(
-                "฿${fmtMoney(bill.amount)}",
-                color    = Purple,
-                fontSize = 15.sp,
+                "฿${fmtMoney(totalAmount)}",
+                color      = Purple,
+                fontSize   = 15.sp,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
+                modifier   = Modifier.padding(top = 2.dp)
             )
+
+            // ✅ breakdown ค่าห้อง / น้ำ / ไฟ
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                InfoPill("ห้อง ฿${fmtMoney(bill.roomPrice)}")
+                InfoPill("💧 ${bill.waterUnit} หน่วย")
+                InfoPill("⚡ ${bill.electricUnit} หน่วย")
+            }
+
+            Spacer(Modifier.height(14.dp))
 
             if (bill.status == "รอตรวจสอบ") {
                 Button(
                     onClick  = onInspect,
                     modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape  = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Purple)
+                    shape    = RoundedCornerShape(10.dp),
+                    colors   = ButtonDefaults.buttonColors(containerColor = Purple)
                 ) {
-                    Icon(
-                        Icons.Default.CheckCircle, null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("ตรวจสอบ", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 }
@@ -284,19 +262,31 @@ private fun BillCard(
                 OutlinedButton(
                     onClick  = onDetail,
                     modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape  = RoundedCornerShape(10.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderColor),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextMain)
+                    shape    = RoundedCornerShape(10.dp),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, BorderColor),
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = TextMain)
                 ) {
                     Text("ดูรายละเอียด", fontSize = 14.sp, color = TextMain)
                     Spacer(Modifier.width(4.dp))
-                    Icon(
-                        Icons.Default.ArrowForward, null,
-                        tint = TextSub, modifier = Modifier.size(18.dp)
-                    )
+                    Icon(Icons.Default.ArrowForward, null, tint = TextSub, modifier = Modifier.size(18.dp))
                 }
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────
+//  INFO PILL
+// ─────────────────────────────────────────────
+@Composable
+private fun InfoPill(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(BgGray)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(text, fontSize = 11.sp, color = TextSub)
     }
 }
 

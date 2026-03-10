@@ -140,7 +140,7 @@ fun EditTenantScreen(
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            ActionButtons()
+
             Spacer(modifier = Modifier.height(0.dp))
         }
     }

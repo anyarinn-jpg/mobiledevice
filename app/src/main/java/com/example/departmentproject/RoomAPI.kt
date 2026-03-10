@@ -1,13 +1,15 @@
 package com.example.departmentproject
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
-import retrofit2.http.Field
-import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -27,15 +29,9 @@ interface RoomAPI {
         @Query("owner_id") ownerId: Int
     ): List<RoomType>
 
-    @FormUrlEncoded
     @POST("insertRoom")
     suspend fun insertRoom(
-        @Field("room_number") room_number: String,
-        @Field("status") status: String,
-        @Field("building_id") building_id: Int,
-        @Field("room_type_id") room_type_id: Int,
-        @Field("owner_id") owner_id: Int,
-        @Field("picture") picture: String?
+        @Body room: Room
     ): Response<ApiResponse>
 
     @PUT("room/{id}")
@@ -59,7 +55,30 @@ interface RoomAPI {
     suspend fun getOwnerId(
         @Path("user_id") userId: Int
     ): Response<OwnerIdResponse>
+
+    @Multipart
+    @POST("/uploadSlip")
+    suspend fun uploadSlip(
+
+        @Part("bill_id") billId: RequestBody,
+
+        @Part slip: MultipartBody.Part
+
+    ): Response<ApiResponse>
+    @GET("bill/room/{room_id}")
+    suspend fun getLatestBillByRoom(
+        @Path("room_id") roomId: Int
+    ): Response<BillResponse> // สร้าง Data Class รองรับผลลัพธ์
+
 }
+
+data class BillResponse(
+    val bill_id: Int,
+    val user_id: Int,
+    val total_amount: Double,
+    val status: String
+)
+
 
 data class OwnerIdResponse(
     val owner_id: Int?

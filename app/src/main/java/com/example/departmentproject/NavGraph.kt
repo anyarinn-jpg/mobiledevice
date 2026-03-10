@@ -15,59 +15,74 @@ fun NavGraph(navController: NavHostController) {
     val vm: DormitoryViewModel = viewModel()
     val roomViewModel: RoomViewModel = viewModel()
 
+    val context = LocalContext.current
+    val sharedPrefs = SharedPreferencesManager(context)
+
+    val userId = sharedPrefs.getUserId()
+    val ownerId = sharedPrefs.getOwnerId()
+
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route,
+        startDestination = Screen.Login.route
     ) {
 
+        // 🔹 LOGIN
         composable(Screen.Login.route) {
             LoginScreen(navController, vm)
         }
 
+        // 🔹 ADMIN DASHBOARD
         composable(Screen.AdminDashboard.route) {
             AdminDashboardScreen(vm, navController)
         }
 
-        composable(Screen.TenantHome.route) {
-            TenantHomeScreen(vm, navController)
-        }
-
+        // 🔹 TENANT LIST
         composable(Screen.TenantList.route) {
             TenantListScreen(vm)
         }
 
+        // 🔹 ROOM LIST
         composable(Screen.RoomList.route) {
             RoomListScreen(vm, navController)
         }
-        composable(route = Screen.RoomManage.route) {
-            RoomManageScreen(navController = navController, viewModel = roomViewModel)
+
+        // 🔹 ROOM MANAGE
+        composable(Screen.RoomManage.route) {
+            RoomManageScreen(
+                navController = navController,
+                viewModel = roomViewModel
+            )
         }
 
-        composable(route = Screen.EditDeleteRoom.route) {
-            EditDeleteRoomScreen(navController = navController, viewModel = roomViewModel)
+        // 🔹 EDIT ROOM
+        composable(Screen.EditDeleteRoom.route) {
+            EditDeleteRoomScreen(
+                navController = navController,
+                viewModel = roomViewModel
+            )
         }
 
-        composable(route = Screen.InsertRoom.route) {
-            InsertRoomScreen(navController = navController, viewModel = roomViewModel)
+        // 🔹 INSERT ROOM
+        composable(Screen.InsertRoom.route) {
+            InsertRoomScreen(
+                navController = navController,
+                viewModel = roomViewModel
+            )
         }
+
+        // 🔹 FINANCE
         composable(Screen.Finance.route) {
             BillScreen(navController)
         }
+
+        // 🔹 METER
         composable(Screen.Meter.route) {
             MeterScreen(
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(Screen.PaymentConfirm.route) {
-            PaymentConfirmScreen(
-                onConfirm = {
-                    navController.popBackStack()
-                },
-                onCancel = {
-                    navController.popBackStack()
-                }
-            )
-        }
+
+        // 🔹 SETTINGS
         composable(Screen.Setting.route) {
             SettingScreen(
                 onBack = { navController.popBackStack() },
@@ -79,24 +94,49 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
+        // 🔹 HOME
         composable(Screen.Home.route) {
             HomeScreen(navController, vm)
         }
 
-        composable("bills") {
-            BillsScreentwo(navController = navController, viewModel = vm)
-        }
+        // 🔹 BILL LIST
         composable(
-            route = "bill_detail/{billId}",
-            arguments = listOf(navArgument("billId") { type = NavType.IntType })
+            route = "bills/{billId}",
+            arguments = listOf(
+                navArgument("billId") { type = NavType.IntType }
+            )
         ) { backStackEntry ->
+
             val billId = backStackEntry.arguments?.getInt("billId") ?: 0
+
             BillDetailScreen(
                 navController = navController,
                 viewModel = vm,
                 billId = billId
             )
         }
+
+        // 🔹 BILL DETAIL
+        composable(
+            route = "bill_detail/{billId}",
+            arguments = listOf(
+                navArgument("billId") {
+                    type = NavType.IntType
+                }
+            )
+        ) { backStackEntry ->
+
+            val billId =
+                backStackEntry.arguments?.getInt("billId") ?: 0
+
+            BillDetailScreen(
+                navController = navController,
+                viewModel = vm,
+                billId = billId
+            )
+        }
+
+        // 🔹 PAYMENT FORM
         composable(
             route = "payment_form/{amount}/{month}/{year}",
             arguments = listOf(
@@ -106,83 +146,73 @@ fun NavGraph(navController: NavHostController) {
             )
         ) { backStackEntry ->
 
-            val amount = backStackEntry.arguments?.getString("amount") ?: "0"
-            val month = backStackEntry.arguments?.getString("month") ?: ""
-            val year = backStackEntry.arguments?.getString("year") ?: ""
+            val amount =
+                backStackEntry.arguments?.getString("amount") ?: "0"
+
+            val month =
+                backStackEntry.arguments?.getString("month") ?: ""
+
+            val year =
+                backStackEntry.arguments?.getString("year") ?: ""
 
             PaymentFormScreen(
                 amountFromBill = amount,
                 month = month,
                 year = year,
-                onNext = { navController.navigate(Screen.PaymentConfirm.route) },
-                onCancel = { navController.popBackStack() }
+                userId = userId,
+                navController = navController
             )
         }
+
+        // 🔹 REGISTER OWNER
         composable("registerOwner") {
             RegisterOwnerScreen(navController)
         }
 
-//tenant
+        // 🔹 TENANT FORM
         composable(
-            "tenant_form/{roomId}",
+            route = "tenant_form/{roomId}",
             arguments = listOf(
-                navArgument("roomId") { type = NavType.IntType }
+                navArgument("roomId") {
+                    type = NavType.IntType
+                }
             )
         ) { backStackEntry ->
-
-            val roomId = backStackEntry.arguments?.getInt("roomId") ?: 0
-
-            TenantFormScreen(navController, roomId)
-
-        }
-
-        composable(
-            "tenant_account/{roomId}",
-            arguments = listOf(
-                navArgument("roomId") { type = NavType.IntType }
-            )
-        ) { backStackEntry ->
-
-            val roomId = backStackEntry.arguments?.getInt("roomId") ?: 0
-
-            val context = LocalContext.current
-            val ownerId = SharedPreferencesManager(context).getOwnerId()
-
-            TenantAccountScreen(navController, roomId, ownerId)
-
-        }
-        composable(
-            "tenant_form/{roomId}"
-        ) {
 
             val roomId =
-                it.arguments?.getString("roomId")!!.toInt()
+                backStackEntry.arguments?.getInt("roomId") ?: 0
 
             TenantFormScreen(
                 navController,
                 roomId
             )
-
         }
 
+        // 🔹 TENANT ACCOUNT
         composable(
-            "tenant_account/{tenantId}/{roomId}"
-        ) {
+            route = "tenant_account/{tenantId}/{roomId}",
+            arguments = listOf(
+                navArgument("tenantId") {
+                    type = NavType.IntType
+                },
+                navArgument("roomId") {
+                    type = NavType.IntType
+                }
+            )
+        ) { backStackEntry ->
 
             val tenantId =
-                it.arguments?.getString("tenantId")!!.toInt()
+                backStackEntry.arguments?.getInt("tenantId") ?: 0
 
             val roomId =
-                it.arguments?.getString("roomId")!!.toInt()
+                backStackEntry.arguments?.getInt("roomId") ?: 0
 
             TenantAccountScreen(
                 navController,
                 tenantId,
                 roomId
             )
-
         }
 
     }
-
 }

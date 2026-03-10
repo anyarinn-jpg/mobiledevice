@@ -2,11 +2,15 @@
 package com.example.departmentproject
 
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -16,6 +20,18 @@ interface ApiService {
     suspend fun getBill(
         @Path("room_id") roomId: Int
     ): Response<UtilityBill>
+
+    @GET("bill/user/{user_id}")
+    suspend fun getBillByUser(
+        @Path("user_id") userId: Int
+    ): Response<UtilityBill>
+
+
+
+    @POST("/createTenantAccount")
+    suspend fun createTenantAccount(
+        @Body request: UserRequest
+    ): Response<ApiResponse>
 
     @GET("/allRooms")
     suspend fun getAllRooms(

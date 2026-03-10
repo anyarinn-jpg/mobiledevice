@@ -1,6 +1,10 @@
 package com.example.departmentproject
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.getValue
@@ -11,6 +15,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.ByteArrayOutputStream
 
 class RoomViewModel : ViewModel() {
     var roomList = mutableStateListOf<Room>()
@@ -33,6 +41,9 @@ class RoomViewModel : ViewModel() {
     var availableCount by mutableIntStateOf(0)
     var unavailableCount by mutableIntStateOf(0)
 
+    // Image state
+    var selectedImageUri by mutableStateOf<Uri?>(null)
+
     fun initializeOwner(userId: Int, onComplete: (Int) -> Unit = {}) {
         viewModelScope.launch {
             try {
@@ -42,7 +53,7 @@ class RoomViewModel : ViewModel() {
                     val id = response.body()?.owner_id ?: 0
                     ownerId = id
                     Log.d("DROPDOWN_DEBUG", "ได้ค่า owner_id: $id")
-                    
+
                     // หลังจากได้ ID แล้ว ให้โหลดข้อมูลทันที
                     fetchBuildingsAndRoomTypes(id)
                     onComplete(id)
@@ -60,7 +71,7 @@ class RoomViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 Log.d("DROPDOWN_DEBUG", "กำลังดึงอาคารและประเภทห้องสำหรับ owner_id: $oid")
-                
+
                 // 1. ดึงข้อมูลอาคาร
                 val bResponse = RoomClient.roomAPI.getBuildings(oid)
                 buildings.clear()
@@ -107,23 +118,20 @@ class RoomViewModel : ViewModel() {
     fun insertRoom(room: Room, context: Context, oid: Int, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
-                val response = RoomClient.roomAPI.insertRoom(
-                    room_number = room.room_number,
-                    status = room.status,
-                    building_id = room.building_id,
-                    room_type_id = room.room_type_id,
-                    owner_id = oid,
-                    picture = room.picture
-                )
+                val response = RoomClient.roomAPI.insertRoom(room.copy(owner_id = oid))
+
                 if (response.isSuccessful && response.body()?.error == false) {
                     Toast.makeText(context, "เพิ่มสำเร็จ", Toast.LENGTH_SHORT).show()
                     onSuccess()
                     getAllRooms(oid)
                 } else {
-                    Toast.makeText(context, "เพิ่มไม่สำเร็จ: ${response.body()?.message}", Toast.LENGTH_SHORT).show()
+                    val errorMsg = response.errorBody()?.string() ?: response.body()?.message ?: "Unknown Error"
+                    Log.e("RoomViewModel", "Insert Fail: $errorMsg (Code: ${response.code()})")
+                    Toast.makeText(context, "เพิ่มไม่สำเร็จ: $errorMsg", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 Log.e("RoomViewModel", "Insert Error: ${e.message}")
+                Toast.makeText(context, "เกิดข้อผิดพลาด: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -143,6 +151,7 @@ class RoomViewModel : ViewModel() {
         selectedBuildingId = room.building_id
         selectedRoomTypeId = room.room_type_id
         pictureUrlText = room.picture ?: ""
+        selectedImageUri = null
     }
 
     fun clearForm() {
@@ -152,6 +161,7 @@ class RoomViewModel : ViewModel() {
         selectedBuildingId = 0
         selectedRoomTypeId = 0
         pictureUrlText = ""
+        selectedImageUri = null
     }
 
     fun updateRoom(context: Context, oid: Int, onSuccess: () -> Unit) {
@@ -219,6 +229,102 @@ class RoomViewModel : ViewModel() {
                 roomList.clear()
                 roomList.addAll(all.filter { it.status == "ไม่ว่าง" })
             } catch (e: Exception) { }
+        }
+    }
+
+    // Helper to convert Uri to Base64
+    fun getBase64FromUri(context: Context, uri: Uri): String? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            val outputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+            val bytes = outputStream.toByteArray()
+            Base64.encodeToString(bytes, Base64.DEFAULT)
+        } catch (e: Exception) {
+            Log.e("RoomViewModel", "Error converting image: ${e.message}")
+            null
+        }
+    }
+
+    fun uploadSlip(
+        context: Context,
+        billId: Int,
+        imageUri: Uri
+    ) {
+
+        viewModelScope.launch {
+
+            try {
+
+                val inputStream =
+                    context.contentResolver.openInputStream(imageUri)
+
+                val fileBytes = inputStream?.readBytes()
+
+                val requestFile =
+                    fileBytes!!.toRequestBody("image/*".toMediaType())
+
+                val slipPart =
+                    MultipartBody.Part.createFormData(
+                        "slip",
+                        "slip.jpg",
+                        requestFile
+                    )
+
+                val billBody =
+                    billId.toString()
+                        .toRequestBody("text/plain".toMediaType())
+
+                val response =
+                    RoomClient.roomAPI.uploadSlip(
+                        billBody,
+                        slipPart
+                    )
+
+                if (response.isSuccessful) {
+
+                    Toast.makeText(
+                        context,
+                        "อัปโหลดสลิปสำเร็จ",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                } else {
+
+                    Toast.makeText(
+                        context,
+                        "อัปโหลดไม่สำเร็จ",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                }
+
+            } catch (e: Exception) {
+
+                Log.e("UPLOAD", e.message ?: "error")
+
+            }
+
+        }
+    }
+    // เพิ่ม State ใน RoomViewModel
+    var currentUserIdByBill by mutableIntStateOf(0)
+    var currentBillId by mutableIntStateOf(0)
+
+    fun fetchBillDetails(roomId: Int) {
+        viewModelScope.launch {
+            try {
+                val response = RoomClient.roomAPI.getLatestBillByRoom(roomId)
+                if (response.isSuccessful) {
+                    val bill = response.body()
+                    currentBillId = bill?.bill_id ?: 0
+                    currentUserIdByBill = bill?.user_id ?: 0
+                    Log.d("BILL_DEBUG", "ดึงข้อมูลบิลสำเร็จ: BillID=$currentBillId, UserID=$currentUserIdByBill")
+                }
+            } catch (e: Exception) {
+                Log.e("BILL_DEBUG", "Error: ${e.message}")
+            }
         }
     }
 }

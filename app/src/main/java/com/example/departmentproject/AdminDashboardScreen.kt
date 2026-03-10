@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
-private val Primary      = Color(0xFF6B72CA)   // purple
+private val Primary      = Color(0xFF6B72CA)
 private val BgPage       = Color(0xFFF4F5FB)
 private val CardWhite    = Color.White
 private val GreenBg      = Color(0xFFDFF5E4)
@@ -69,14 +69,13 @@ fun TopHeader(name: String) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier            = Modifier
+            modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment   = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar circle
                 Box(
                     modifier        = Modifier
                         .size(44.dp)
@@ -103,28 +102,9 @@ fun TopHeader(name: String) {
                 }
             }
 
-            // Notification bell with badge
-            Box {
-                IconButton(onClick = {}) {
-                    Icon(
-                        Icons.Default.Notifications,
-                        contentDescription = "Notifications",
-                        tint = Color(0xFF555580)
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(Color(0xFFE53935), CircleShape)
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-6).dp, y = 6.dp)
-                )
-            }
         }
     }
 }
-
-// ─── Dashboard Cards ──────────────────────────────────────────────────────────
 @Composable
 fun DashboardCards(summary: DashboardSummary?) {
     summary ?: return
@@ -152,7 +132,7 @@ fun DashboardCards(summary: DashboardSummary?) {
 
     Spacer(Modifier.height(4.dp))
 
-    // Monthly income card
+
     Card(
         shape  = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = CardWhite),
@@ -206,7 +186,7 @@ fun DashboardCard(
     ) {
         Column(Modifier.padding(16.dp)) {
             Box(
-                modifier        = Modifier
+                modifier = Modifier
                     .size(38.dp)
                     .background(bgColor, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
@@ -220,7 +200,6 @@ fun DashboardCard(
     }
 }
 
-// ─── Quick Actions ────────────────────────────────────────────────────────────
 
 
 @Composable
@@ -229,7 +208,6 @@ fun QuickActionSection(navController: NavHostController) {
     var selectedIndex by remember { mutableStateOf(-1) }
 
     val actions = listOf(
-        QuickAction("ผู้เช่า", Icons.Default.PersonAdd, Screen.TenantList.route),
         QuickAction(
             "ห้องพัก",
             Icons.Default.Apartment,
@@ -312,7 +290,6 @@ fun ActionButton(
     }
 }
 
-// ─── Recent Activity ──────────────────────────────────────────────────────────
 @Composable
 fun RecentActivitySection(list: List<RecentPayment>) {
     Column {
@@ -330,45 +307,88 @@ fun RecentActivitySection(list: List<RecentPayment>) {
         Spacer(Modifier.height(4.dp))
 
         list.forEach { payment ->
+
+            val isPaid =
+                payment.status.lowercase() == "paid" ||
+                        payment.status == "ชำระแล้ว"
+
+            val textStatus =
+                if (isPaid)
+                    "ชำระค่าเช่าแล้ว - ห้อง ${payment.roomNumber}"
+                else
+                    "รอตรวจสอบ - ห้อง ${payment.roomNumber}"
+
+            val icon =
+                if (isPaid)
+                    Icons.Default.Check
+                else
+                    Icons.Default.HourglassTop
+
+            val iconBg =
+                if (isPaid)
+                    GreenBg
+                else
+                    Color(0xFFFFF4E5)
+
+            val iconColor =
+                if (isPaid)
+                    GreenIcon
+                else
+                    Color(0xFFF57C00)
+
             Card(
-                shape    = RoundedCornerShape(16.dp),
-                colors   = CardDefaults.cardColors(containerColor = CardWhite),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = CardWhite),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
             ) {
                 Row(
-                    modifier          = Modifier
+                    modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+
                         Box(
-                            modifier        = Modifier
+                            modifier = Modifier
                                 .size(36.dp)
-                                .background(GreenBg, CircleShape),
+                                .background(iconBg, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.Check, null, tint = GreenIcon, modifier = Modifier.size(18.dp))
+                            Icon(
+                                icon,
+                                contentDescription = null,
+                                tint = iconColor,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
+
                         Spacer(Modifier.width(12.dp))
+
                         Column {
                             Text(
-                                "ชำระค่าเช่าแล้ว - ห้อง ${payment.roomNumber}",
+                                textStatus,
                                 fontWeight = FontWeight.Medium,
-                                fontSize   = 14.sp,
-                                color      = Color(0xFF1A1A2E)
+                                fontSize = 14.sp,
+                                color = Color(0xFF1A1A2E)
                             )
-                            Text(payment.timeText, fontSize = 12.sp, color = GrayText)
+
+                            Text(
+                                payment.timeText,
+                                fontSize = 12.sp,
+                                color = GrayText
+                            )
                         }
                     }
+
                     Text(
                         "฿${payment.amount}",
                         fontWeight = FontWeight.Bold,
-                        fontSize   = 14.sp,
-                        color      = Color(0xFF1A1A2E)
+                        fontSize = 14.sp,
+                        color = Color(0xFF1A1A2E)
                     )
                 }
             }
@@ -376,7 +396,7 @@ fun RecentActivitySection(list: List<RecentPayment>) {
     }
 }
 
-// ─── Bottom Navigation ────────────────────────────────────────────────────────
+
 @Composable
 fun AdminBottomBar(navController: NavHostController) {
 
@@ -420,7 +440,7 @@ fun AdminBottomBar(navController: NavHostController) {
         )
 
         NavigationBarItem(
-                selected = currentRoute == Screen.Setting.route,
+            selected = currentRoute == Screen.Setting.route,
             onClick = {
                 navController.navigate(Screen.Setting.route) {
                     launchSingleTop = true

@@ -1,23 +1,64 @@
 package com.example.departmentproject
 
+import android.util.Base64
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,6 +68,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
+import java.text.DecimalFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,7 +82,7 @@ fun RoomManageScreen(navController: NavHostController, viewModel: RoomViewModel 
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var selectedRoomId by remember { mutableIntStateOf(-1) }
-    
+
     var selectedFilter by remember { mutableStateOf("ทั้งหมด") }
     val currentFilter by rememberUpdatedState(selectedFilter)
 
@@ -48,6 +91,7 @@ fun RoomManageScreen(navController: NavHostController, viewModel: RoomViewModel 
         if (ownerId != 0) {
             viewModel.ownerId = ownerId
             viewModel.getAllRooms(ownerId)
+            viewModel.fetchBuildingsAndRoomTypes(ownerId) // โหลดข้อมูลประเภทห้องเพื่อเอาราคา
         }else {
             Toast.makeText(context, "ไม่พบ User ID, กรุณาล็อกอินใหม่", Toast.LENGTH_LONG).show()
         }
@@ -62,6 +106,7 @@ fun RoomManageScreen(navController: NavHostController, viewModel: RoomViewModel 
                     "ว่าง" -> viewModel.getAvailableRooms(viewModel.ownerId)
                     "ไม่ว่าง" -> viewModel.getUnavailableRooms(viewModel.ownerId)
                 }
+                viewModel.fetchBuildingsAndRoomTypes(viewModel.ownerId)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -94,7 +139,8 @@ fun RoomManageScreen(navController: NavHostController, viewModel: RoomViewModel 
                 .fillMaxSize()
                 .background(Color(0xFFF5F5F5))
         ) {
-            Text("Owner ID: ${viewModel.ownerId}", modifier = Modifier.padding(start = 16.dp), fontSize = 12.sp, color = Color.Gray)
+//            เช็ค ค่า Owner ID
+//            Text("Owner ID: ${viewModel.ownerId}", modifier = Modifier.padding(start = 16.dp), fontSize = 12.sp, color = Color.Gray)
 
             OutlinedTextField(
                 value = viewModel.searchQuery,
@@ -158,6 +204,7 @@ fun RoomManageScreen(navController: NavHostController, viewModel: RoomViewModel 
                 items(viewModel.filteredRoomList) { room ->
                     RoomItem(
                         room = room,
+                        roomTypes = viewModel.roomTypes,
                         onEditClick = {
                             viewModel.setRoomForEdit(room)
                             navController.navigate(Screen.EditDeleteRoom.route)
@@ -205,11 +252,31 @@ fun RoomManageScreen(navController: NavHostController, viewModel: RoomViewModel 
 @Composable
 fun RoomItem(
     room: Room,
+    roomTypes: List<RoomType>,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onToggleStatus: () -> Unit,
     onManageTenant: () -> Unit
 ) {
+    val roomType = roomTypes.find { it.room_type_id == room.room_type_id }
+    val formatter = DecimalFormat("#,###")
+    val priceText = roomType?.let { formatter.format(it.price) } ?: "0"
+
+    // จัดการรูปภาพ
+    val imageSource = remember(room.picture) {
+        if (room.picture.isNullOrEmpty()) {
+            null
+        } else if (room.picture.startsWith("http")) {
+            room.picture
+        } else {
+            try {
+                Base64.decode(room.picture, Base64.DEFAULT)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -227,7 +294,21 @@ fun RoomItem(
                     .background(Color(0xFFE0E0E0)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Apartment, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(40.dp))
+                if (imageSource != null) {
+                    AsyncImage(
+                        model = imageSource,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Apartment,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -235,8 +316,13 @@ fun RoomItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text(text = "ห้อง ${room.room_number}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(text = "ประเภท ID: ${room.room_type_id}", color = Color.Gray, fontSize = 14.sp)
+                        Text(text = "ห้อง ${room.room_number}", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text(
+                            text = "฿$priceText/เดือน",
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
                     }
 
                     Column(horizontalAlignment = Alignment.End) {

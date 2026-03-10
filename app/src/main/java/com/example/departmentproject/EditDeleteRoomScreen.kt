@@ -1,11 +1,18 @@
 package com.example.departmentproject
 
+import android.net.Uri
+import android.util.Base64
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,11 +20,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,10 +36,18 @@ fun EditDeleteRoomScreen(navController: NavHostController, viewModel: RoomViewMo
     val userId = sharedPrefs.getSavedStdId().toIntOrNull() ?: 0
 
     val statusOptions = listOf("ว่าง", "ไม่ว่าง")
+    val scrollState = rememberScrollState()
 
     // Dropdown States
     var buildingExpanded by remember { mutableStateOf(false) }
     var roomTypeExpanded by remember { mutableStateOf(false) }
+
+    // Image Picker Launcher
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        viewModel.selectedImageUri = uri
+    }
 
     LaunchedEffect(userId) {
         if (userId != 0) {
@@ -56,31 +73,54 @@ fun EditDeleteRoomScreen(navController: NavHostController, viewModel: RoomViewMo
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Owner ID: ${viewModel.ownerId}", fontSize = 12.sp, color = Color.Gray)
-            Text(text = "รหัสห้อง: ${viewModel.roomIdText}", fontSize = 14.sp, color = Color.Gray)
 
-            OutlinedTextField(
-                value = viewModel.pictureUrlText,
-                onValueChange = { viewModel.pictureUrlText = it },
-                label = { Text("URL รูปภาพห้องพัก") },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("ใส่ลิงก์รูปภาพ เช่น https://...") }
-            )
+            // Photo Selection Area
+            Text("รูปภาพห้องพัก", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Start))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF5F5F5))
+                    .clickable { launcher.launch("image/*") },
+                contentAlignment = Alignment.Center
+            ) {
+                if (viewModel.selectedImageUri != null) {
+                    AsyncImage(
+                        model = viewModel.selectedImageUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (viewModel.pictureUrlText.isNotEmpty()) {
+                    // รูปเดิมจากฐานข้อมูล
+                    val imageSource = if (viewModel.pictureUrlText.startsWith("http")) {
+                        viewModel.pictureUrlText
+                    } else {
+                        try {
+                            Base64.decode(viewModel.pictureUrlText, Base64.DEFAULT)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
 
-            if (viewModel.pictureUrlText.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFE0E0E0)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("ตัวอย่างรูปภาพจาก URL", color = Color.Gray)
+                    AsyncImage(
+                        model = imageSource,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("คลิกเพื่อเลือกรูปภาพใหม่", color = Color.Gray)
+                    }
                 }
             }
 
@@ -168,12 +208,27 @@ fun EditDeleteRoomScreen(navController: NavHostController, viewModel: RoomViewMo
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // ... อยู่ภายใน Column ใน Scaffold ...
+
             Button(
                 onClick = {
                     if (viewModel.roomNumberText.isBlank() || viewModel.selectedBuildingId == 0 || viewModel.selectedRoomTypeId == 0) {
                         Toast.makeText(context, "กรุณากรอกข้อมูลให้ครบถ้วน", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
+
+                    if (viewModel.ownerId == 0) {
+                        Toast.makeText(context, "กำลังโหลดข้อมูลเจ้าของหอพัก...", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    //แปลงรูปภาพใหม่เป็น Base64 (ถ้ามีการเลือกรูปใหม่)
+                    val base64Image = viewModel.selectedImageUri?.let { viewModel.getBase64FromUri(context, it) }
+                    if (base64Image != null) {
+                        viewModel.pictureUrlText = base64Image
+                    }
+
+                    // Update
                     viewModel.updateRoom(context, viewModel.ownerId) {
                         navController.popBackStack()
                     }

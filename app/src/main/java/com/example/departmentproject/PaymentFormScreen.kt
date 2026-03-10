@@ -1,15 +1,32 @@
 package com.example.departmentproject
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import coil.compose.rememberAsyncImagePainter
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -17,122 +34,284 @@ fun PaymentFormScreen(
     amountFromBill: String,
     month: String,
     year: String,
-    onNext: () -> Unit,
-    onCancel: () -> Unit
+    userId: Int,
+    navController: NavHostController
 ) {
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var amount by remember { mutableStateOf(amountFromBill) }
-    val billDate = "$month/$year"
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        imageUri = uri
+    }
 
     Scaffold(
-        containerColor = Color(0xFFF8FAFC),
+
         topBar = {
+
             TopAppBar(
-                title = { Text("เลือกการชำระเงิน") }
+
+                title = { Text("ชำระเงินค่าเช่าหอ") },
+
+                navigationIcon = {
+
+                    IconButton(
+                        onClick = { navController.popBackStack() }
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "back"
+                        )
+
+                    }
+
+                }
+
             )
+
         }
+
     ) { padding ->
 
         Column(
+
             modifier = Modifier
                 .padding(padding)
                 .padding(16.dp)
                 .fillMaxSize()
+
         ) {
 
-            // 🔵 ยอดรวม
             Card(
+
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFEFF6FF)
+                    containerColor = Color(0xFFE8F0FE)
                 ),
                 modifier = Modifier.fillMaxWidth()
+
             ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("ยอดที่ต้องชำระ", color = Color.Gray)
-                    Spacer(Modifier.height(4.dp))
+
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+
                     Text(
-                        "$amountFromBill บาท",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color(0xFF1D4ED8)
+                        text = "ยอดที่ต้องชำระ",
+                        style = MaterialTheme.typography.titleMedium
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text("รอบบิล: $billDate", color = Color.Gray)
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "$amountFromBill บาท",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text("เดือน $month / ปี $year")
+
                 }
+
             }
 
-            Spacer(Modifier.height(24.dp))
-
-            Text("รายละเอียดการชำระ",
-                style = MaterialTheme.typography.titleMedium)
-
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             OutlinedTextField(
-                value = billDate,
-                onValueChange = {},
-                enabled = false,
-                label = { Text("รอบบิล") },
-                modifier = Modifier.fillMaxWidth()
-            )
 
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it },
-                label = { Text("จำนวนเงิน (บาท)") },
+                label = { Text("จำนวนเงินที่โอน") },
                 modifier = Modifier.fillMaxWidth()
+
             )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // 🔥 แนบสลิปกลับมาแล้ว
             Text(
-                "แนบหลักฐานการโอน",
+                text = "แนบสลิปการโอน",
                 style = MaterialTheme.typography.titleMedium
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Box(
+
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .height(200.dp)
                     .border(
-                        1.dp,
-                        Color(0xFFCBD5E1),
-                        RoundedCornerShape(16.dp)
-                    ),
+                        2.dp,
+                        Color.Gray,
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable {
+
+                        launcher.launch("image/*")
+
+                    },
+
                 contentAlignment = Alignment.Center
+
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("แตะเพื่ออัปโหลดสลิป", color = Color.Gray)
-                    Spacer(Modifier.height(4.dp))
-                    Text("รองรับ JPG, PNG", color = Color.LightGray)
+
+                if (imageUri != null) {
+
+                    Image(
+                        painter = rememberAsyncImagePainter(imageUri),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                } else {
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.Default.AttachFile,
+                            contentDescription = null
+                        )
+
+                        Text("แตะเพื่อเลือกสลิป")
+
+                    }
+
                 }
+
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(1f))
 
             Button(
-                onClick = onNext,
+
+                onClick = {
+
+                    if (imageUri == null) {
+
+                        Toast.makeText(
+                            context,
+                            "กรุณาแนบสลิปก่อน",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        return@Button
+
+                    }
+
+                    scope.launch {
+
+                        try {
+
+                            val inputStream =
+                                context.contentResolver.openInputStream(imageUri!!)
+
+                            val file =
+                                File(context.cacheDir, "slip.jpg")
+
+                            inputStream!!.use { input ->
+                                file.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+
+                            val requestFile =
+                                file.readBytes()
+                                    .toRequestBody("image/*".toMediaType())
+
+                            val slipPart =
+                                MultipartBody.Part.createFormData(
+                                    "slip",
+                                    file.name,
+                                    requestFile
+                                )
+
+                            val amountBody =
+                                amount.toRequestBody("text/plain".toMediaType())
+
+                            val monthBody =
+                                month.toRequestBody("text/plain".toMediaType())
+
+                            val yearBody =
+                                year.toRequestBody("text/plain".toMediaType())
+
+                            val userBody =
+                                userId.toString()
+                                    .toRequestBody("text/plain".toMediaType())
+
+                            val response =
+                                RetrofitInstance.api.uploadSlip(
+                                    slipPart,
+                                    amountBody,
+                                    monthBody,
+                                    yearBody,
+                                    userBody
+                                )
+
+                            if (response.isSuccessful) {
+
+                                Toast.makeText(
+                                    context,
+                                    "ชำระเงินสำเร็จ",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                navController.navigate(Screen.Finance.route) {
+                                    popUpTo(Screen.Finance.route)
+                                    launchSingleTop = true
+                                }
+
+                            }
+
+                        } catch (e: Exception) {
+
+                            Toast.makeText(
+                                context,
+                                e.message,
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                        }
+
+                    }
+
+                },
+
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp)
+                    .height(55.dp),
+
+                shape = RoundedCornerShape(14.dp)
+
             ) {
+
                 Text("ยืนยันการชำระ")
+
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             TextButton(
-                onClick = onCancel,
+
+                onClick = { navController.popBackStack() },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
+
             ) {
-                Text("ยกเลิก", color = Color.Gray)
+
+                Text("ยกเลิก")
+
             }
+
         }
+
     }
+
 }

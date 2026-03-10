@@ -1,20 +1,31 @@
 package com.example.departmentproject
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,21 +36,26 @@ fun InsertRoomScreen(
     val context = LocalContext.current
     val sharedPrefs = SharedPreferencesManager(context)
     val ownerId = sharedPrefs.getOwnerId()
-    
+
     val statusOptions = listOf("ว่าง", "ไม่ว่าง")
+    val scrollState = rememberScrollState()
 
     // Dropdown States
     var buildingExpanded by remember { mutableStateOf(false) }
     var roomTypeExpanded by remember { mutableStateOf(false) }
 
+    // Image Picker Launcher
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        viewModel.selectedImageUri = uri
+    }
+
     LaunchedEffect(ownerId) {
-
-        viewModel.ownerId = ownerId   // ⭐ ใส่บรรทัดนี้
-
+        viewModel.ownerId = ownerId
         if (ownerId != 0) {
             viewModel.fetchBuildingsAndRoomTypes(ownerId)
         }
-
         viewModel.clearForm()
     }
 
@@ -59,11 +75,38 @@ fun InsertRoomScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Owner ID: ${viewModel.ownerId}", fontSize = 12.sp, color = Color.Gray)
+
+            // Photo Selection Area
+            Text("รูปภาพห้องพัก", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.align(Alignment.Start))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFF5F5F5))
+                    .clickable { launcher.launch("image/*") },
+                contentAlignment = Alignment.Center
+            ) {
+                if (viewModel.selectedImageUri != null) {
+                    AsyncImage(
+                        model = viewModel.selectedImageUri,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("คลิกเพื่อเลือกรูปภาพ", color = Color.Gray)
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = viewModel.roomNumberText,
@@ -167,13 +210,6 @@ fun InsertRoomScreen(
                 }
             }
 
-            OutlinedTextField(
-                value = viewModel.pictureUrlText,
-                onValueChange = { viewModel.pictureUrlText = it },
-                label = { Text("URL รูปภาพ (ถ้ามี)") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
@@ -183,13 +219,16 @@ fun InsertRoomScreen(
                         return@Button
                     }
 
+                    // Convert image to Base64 if selected
+                    val base64Image = viewModel.selectedImageUri?.let { viewModel.getBase64FromUri(context, it) }
+
                     val room = Room(
                         room_id = 0,
                         room_number = viewModel.roomNumberText,
                         status = viewModel.statusText,
                         building_id = viewModel.selectedBuildingId,
                         room_type_id = viewModel.selectedRoomTypeId,
-                        picture = viewModel.pictureUrlText.ifEmpty { null }
+                        picture = base64Image ?: viewModel.pictureUrlText.ifEmpty { null }
                     )
 
                     viewModel.insertRoom(room, context, viewModel.ownerId) {

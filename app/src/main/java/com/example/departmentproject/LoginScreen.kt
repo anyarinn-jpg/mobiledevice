@@ -36,6 +36,7 @@ fun LoginScreen(
 
     val loginResult = viewModel.loginResult
 
+
     // 🔹 SIDE EFFECT → ฟังผล login
     LaunchedEffect(loginResult) {
 
@@ -44,7 +45,7 @@ fun LoginScreen(
             if (!it.error && it.user_id != null) {
 
                 Toast.makeText(context, "Login successful. User ID: ${it.user_id}", Toast.LENGTH_LONG).show()
-
+                sharedPrefs.saveUserId(it.user_id)
                 sharedPrefs.saveLoginStatus(
                     isLoggedIn = true,
                     stdId = it.user_id.toString(),

@@ -1,5 +1,6 @@
 package com.example.departmentproject
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -39,10 +40,14 @@ fun BillDetailScreen(
     viewModel: DormitoryViewModel,
     billId: Int
 ) {
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     val context = LocalContext.current
 
     val bill = viewModel.dashboardData?.recentPayments
         ?.find { it.billId == billId }
+
+    // ✅ คำนวณยอดรวม (น้ำไฟ + ค่าห้อง) เพื่อใช้แสดงผลในหน้านี้
+    val totalToPay = (bill?.amount ?: 0.0) + (bill?.roomPrice ?: 0.0)
 
     val monthNames = listOf(
         "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน",
@@ -56,7 +61,6 @@ fun BillDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        // ✅ title เปลี่ยนตาม status
                         if (bill?.status == "รอตรวจสอบ") "ยืนยันการชำระเงิน" else "รายละเอียดบิล",
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
@@ -92,7 +96,7 @@ fun BillDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            // ── Header Card ────────────────────────────
+            // ── Header Card (ส่วนสีม่วง) ────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -114,8 +118,10 @@ fun BillDetailScreen(
                         fontSize = 13.sp
                     )
                     Spacer(Modifier.height(12.dp))
+
+                    // ✅ แก้ไขจุดที่ 1: แสดงยอดรวมทั้งหมด (13,500.00)
                     Text(
-                        "฿${fmtMoneyBD(bill.amount)}",
+                        "฿${fmtMoneyBD(totalToPay)}",
                         color = BDWhite,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold
@@ -125,7 +131,7 @@ fun BillDetailScreen(
                 }
             }
 
-            // ── Info Card ──────────────────────────────
+            // ── Info Card (ตารางข้อมูล) ──────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -146,23 +152,30 @@ fun BillDetailScreen(
                         "ประจำเดือน",
                         "${monthNames.getOrElse(bill.billMonth) { "${bill.billMonth}" }} ${bill.billYear}"
                     )
-                    BDInfoRow("สถานะ", bill.status)
+
+                    // ✅ เพิ่มรายละเอียดแยกให้ชัดเจน (Optional แต่แนะนำ)
+                    BDInfoRow("ค่าเช่าห้อง", "฿${fmtMoneyBD(bill.roomPrice)}")
+                    BDInfoRow("ค่าน้ำ+ไฟ", "฿${fmtMoneyBD(bill.amount)}")
+
                     Divider(
                         modifier = Modifier.padding(vertical = 10.dp),
                         color = Color(0xFFEEEEEE)
                     )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "ยอดรวม",
+                            "ยอดรวมทั้งสิ้น",
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                             color = BDTextMain
                         )
+
+                        // ✅ แก้ไขจุดที่ 2: แสดงยอดรวมในตารางสรุป
                         Text(
-                            "฿${fmtMoneyBD(bill.amount)}",
+                            "฿${fmtMoneyBD(totalToPay)}",
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                             color = BDPurple
@@ -173,30 +186,22 @@ fun BillDetailScreen(
 
             // ── ปุ่ม Action ────────────────────────────
             if (bill.status == "รอตรวจสอบ") {
-
-                // ✅ แสดง 2 ปุ่ม: ปฏิเสธ | ยืนยันการชำระเงิน
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // ปุ่ม ปฏิเสธ → กลับหน้าเดิม ไม่เปลี่ยนสถานะ
                     OutlinedButton(
                         onClick = { navController.popBackStack() },
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp, Color(0xFFEEEEEE)
-                        ),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = BDTextMain
-                        )
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = BDTextMain)
                     ) {
                         Text("ปฏิเสธ", fontSize = 15.sp, color = BDTextMain)
                     }
 
-                    // ✅ ปุ่ม ยืนยันการชำระเงิน → เรียก markInspected → status = "ชำระแล้ว"
                     Button(
                         onClick = {
                             viewModel.markInspected(context, bill.billId) {
@@ -209,21 +214,12 @@ fun BillDetailScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = BDPurple)
                     ) {
-                        Icon(
-                            Icons.Default.CheckCircle, null,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(
-                            "ยืนยันการชำระเงิน",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
+                        Text("ยืนยันการชำระเงิน", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
-
             } else {
-                // ✅ สถานะ "ชำระแล้ว" → แสดงแค่ปุ่มกลับ
                 OutlinedButton(
                     onClick = { navController.popBackStack() },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -253,7 +249,6 @@ private fun BDInfoRow(label: String, value: String) {
 
 @Composable
 private fun BDStatusChip(status: String) {
-    // ✅ เหลือแค่ 2 สถานะ
     val (bg, fg) = when (status) {
         "รอตรวจสอบ" -> BDOrangeBg to BDOrangeText
         "ชำระแล้ว"  -> BDGreenBg  to BDGreenText

@@ -1,289 +1,207 @@
 package com.example.departmentproject
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
 
-private val Purple      = Color(0xFF6B6FD4)
-private val BgGray      = Color(0xFFF4F5FB)
-private val White       = Color(0xFFFFFFFF)
-private val TextMain    = Color(0xFF1C1F35)
-private val TextSub     = Color(0xFF9CA3AF)
-private val GreenText   = Color(0xFF0BAB72)
-private val GreenBg     = Color(0xFFD6F5EB)
-private val OrangeText  = Color(0xFFD97706)
-private val OrangeBg    = Color(0xFFFEF3C7)
 
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
-fun BillsScreentwo(
-    navController: NavHostController,
-    viewModel: DormitoryViewModel
-) {
-    val context = LocalContext.current
-    var search by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf("ทั้งหมด") }
+fun BillScreentwo(navController: NavHostController) {
 
-    // ✅ เอา "ตรวจสอบแล้ว" ออก เหลือแค่ 2 สถานะ
-    val filters = listOf("ทั้งหมด", "รอตรวจสอบ", "ชำระแล้ว")
+    var bill by remember { mutableStateOf<UtilityBill?>(null) }
 
-    val bills = viewModel.dashboardData?.recentPayments
-        ?.filter { bill ->
-            val matchSearch = search.isBlank() ||
-                    bill.roomNumber.contains(search, ignoreCase = true)
-            val matchFilter = selectedFilter == "ทั้งหมด" ||
-                    bill.status == selectedFilter
-            matchSearch && matchFilter
-        } ?: emptyList()
-
-    Scaffold(
-        containerColor = BgGray,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "บิลทั้งหมด",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = TextMain
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextMain)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = White)
-            )
+    LaunchedEffect(Unit) {
+        val response = RetrofitInstance.api.getBill(4)
+        if (response.isSuccessful) {
+            bill = response.body()
         }
-    ) { innerPadding ->
+    }
 
-        LazyColumn(
+    bill?.let { data ->
+
+        val billDate = "${data.bill_month}/${data.bill_year}"
+
+        // 🔥 คำนวณค่าใช้จ่ายเอง
+        val electricCost = data.electric_unit * 7
+        val waterCost = data.water_unit * 15
+        val rentCost = 3500
+        val totalAmount = electricCost + waterCost + rentCost
+
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp,
-                top = 16.dp, bottom = 16.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 20.dp)
         ) {
 
-            // ── Search Bar ────────────────────────────
-            item {
-                OutlinedTextField(
-                    value = search,
-                    onValueChange = { search = it },
-                    placeholder = {
-                        Text("ค้นหาห้องพัก...", color = TextSub, fontSize = 14.sp)
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, null, tint = TextSub)
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Purple,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = White,
-                        unfocusedContainerColor = White
-                    )
-                )
-            }
+            Spacer(Modifier.height(24.dp))
 
-            // ── Filter Chips ──────────────────────────
-            item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filters) { filter ->
-                        val isSelected = filter == selectedFilter
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(if (isSelected) Purple else White)
-                                .clickable { selectedFilter = filter }
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = filter,
-                                color = if (isSelected) White else TextSub,
-                                fontSize = 13.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-                        }
-                    }
-                }
-            }
+            Text(
+                text = "Room ${data.room_id} - John Doe",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-            // ── Summary ───────────────────────────────
-            item {
-                Text(
-                    "พบ ${bills.size} รายการ",
-                    fontSize = 13.sp,
-                    color = TextSub
-                )
-            }
+            Text(
+                text = "Ivy Residences - Block A",
+                color = Color.Gray
+            )
 
-            // ── Loading ───────────────────────────────
-            if (viewModel.isLoading) {
-                item {
-                    Box(
-                        Modifier.fillMaxWidth().padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator(color = Purple) }
-                }
-            }
+            Spacer(Modifier.height(24.dp))
 
-            // ── Bill List ─────────────────────────────
-            items(bills) { bill ->
-                BillsCard(
-                    bill = bill,
-                    onInspect = {
-                        navController.navigate("bill_detail/${bill.billId}")
-                    },
-                    onDetail = {
-                        navController.navigate("bill_detail/${bill.billId}")
-                    }
-                )
-            }
-
-            // ── Empty State ───────────────────────────
-            if (!viewModel.isLoading && bills.isEmpty()) {
-                item {
-                    Box(
-                        Modifier.fillMaxWidth().padding(48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "ไม่พบรายการบิล",
-                            color = TextSub,
-                            fontSize = 15.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun BillsCard(
-    bill: RecentPayment,
-    onInspect: () -> Unit,
-    onDetail: () -> Unit
-) {
-    val monthNames = listOf(
-        "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-        "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
-    )
-    val monthLabel = monthNames.getOrElse(bill.billMonth) { "${bill.billMonth}" }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-
-            Row(
+            // 🔵 Summary Card
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BillsStatusChip(bill.status)
-                Text(
-                    "$monthLabel ${bill.billYear}",
-                    fontSize = 12.sp,
-                    color = TextSub
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE8EAF6)
                 )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "ห้อง ${bill.roomNumber}",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = TextMain
-            )
-
-            Text(
-                "฿${fmtMoney2(bill.amount)}",
-                color = Purple,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
-            )
-
-            if (bill.status == "รอตรวจสอบ") {
-                Button(
-                    onClick = onInspect,
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Purple)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    Text("ตรวจสอบ", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                }
-            } else {
-                OutlinedButton(
-                    onClick = onDetail,
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextMain)
-                ) {
-                    Text("ดูรายละเอียด", fontSize = 14.sp, color = TextMain)
+                    Text("ยอดรวมที่ต้องชำระ")
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "฿$totalAmount",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF5763F3)
+                    )
                 }
             }
+
+            Spacer(Modifier.height(28.dp))
+
+            Text(
+                text = "รายการบิล $billDate",
+                fontWeight = FontWeight.SemiBold,
+                color = Color.Gray
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            BillRow(
+                icon = R.drawable.ic_electric,
+                iconBg = Color(0xFFFDEEC4),
+                title = "ค่าไฟ - $billDate",
+                subtitle = "${data.electric_unit} kWh",
+                price = "฿$electricCost"
+            )
+
+            BillRow(
+                icon = R.drawable.ic_water,
+                iconBg = Color(0xFFC8E6FD),
+                title = "ค่าน้ำ - $billDate",
+                subtitle = "${data.water_unit} m³",
+                price = "฿$waterCost"
+            )
+
+            BillRow(
+                icon = R.drawable.ic_home,
+                iconBg = Color(0xFF94AAFD),
+                title = "ค่าเช่า - $billDate",
+                subtitle = "รายเดือน",
+                price = "฿$rentCost"
+            )
+
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    navController.navigate(
+                        "payment_form/$totalAmount/${data.bill_month}/${data.bill_year}"
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp),
+                shape = RoundedCornerShape(30.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF6C73C8)
+                )
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_money),
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("แจ้งการชำระเงิน", color = Color.White)
+            }
+
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun BillsStatusChip(status: String) {
-    // ✅ เอา "ตรวจสอบแล้ว" ออก เหลือแค่ 2 สถานะ
-    val (bg, fg) = when (status) {
-        "รอตรวจสอบ" -> OrangeBg to OrangeText
-        "ชำระแล้ว"  -> GreenBg  to GreenText
-        else         -> OrangeBg to OrangeText
-    }
-    Box(
+fun BillRowtwo(
+    @DrawableRes icon: Int,
+    iconBg: Color,
+    title: String,
+    subtitle: String,
+    price: String
+) {
+    Card(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(bg)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .fillMaxWidth()
+            .padding(bottom = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF4F4F8)
+        )
     ) {
-        Text(status, color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier
+                .padding(18.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .background(iconBg, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = icon),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, color = Color.Gray, fontSize = 13.sp)
+            }
+
+            Text(price, fontWeight = FontWeight.Bold)
+        }
     }
 }
-
-private fun fmtMoney2(amount: Double): String =
-    java.text.NumberFormat.getNumberInstance(java.util.Locale.US).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-    }.format(amount)

@@ -53,4 +53,13 @@ class SharedPreferencesManager(context: Context) {
         return preferences.getInt(KEY_OWNER_ID, 0)
     }
 
+    fun getUserId(): Int {
+        return preferences.getString(KEY_STD_ID, "0")!!.toInt()
+    }
+    fun saveUserId(userId: Int) {
+        val editor = preferences.edit()
+        editor.putInt("user_id", userId)
+        editor.apply()
+    }
+
 }

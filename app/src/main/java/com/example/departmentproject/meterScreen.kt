@@ -60,6 +60,8 @@ fun getShortMonthName(month: String): String {
 
 data class AddBillRequest(
     val room_id: Int,
+    val user_id: Int?,
+    val owner_id: Int?,
     val bill_month: String,
     val bill_year: String,
     val water_unit: Double,
@@ -67,6 +69,7 @@ data class AddBillRequest(
     val total_amount: Double,
     val status: String
 )
+
 
 object RetrofitClient {
     private const val BASE_URL = "http://10.0.2.2:3000"
@@ -84,11 +87,11 @@ object RetrofitClient {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeterScreen(onBack: () -> Unit) {
-    var buildingExpanded by remember { mutableStateOf(false) }
-    var buildingList by remember { mutableStateOf<List<Building>>(emptyList()) }
     val calendar = Calendar.getInstance()
     val currentMonthStr = (calendar.get(Calendar.MONTH) + 1).toString().padStart(2, '0')
     val currentYearStr = calendar.get(Calendar.YEAR).toString()
+    var buildingExpanded by remember { mutableStateOf(false) }
+    var buildingList by remember { mutableStateOf<List<Building>>(emptyList()) }
     val context = LocalContext.current
     val sharedPrefs = SharedPreferencesManager(context)
     val ownerId = sharedPrefs.getOwnerId()
@@ -122,7 +125,7 @@ fun MeterScreen(onBack: () -> Unit) {
                 val response = RetrofitClient.instance.getAllRooms(selectedMonth, selectedYear)
                 roomList = response
                     .filter { it.status.trim().lowercase() == "ไม่ว่าง" }
-                    .distinctBy { it.roomId } // ป้องกันห้องเบิ้ลถ้า API ส่งมาซ้ำ
+                    .distinctBy { it.roomId }
             } catch (e: Exception) {
                 Log.e("API_ERROR", "Error: ${e.message}")
             }
@@ -275,6 +278,10 @@ fun EditBillScreen(room: RoomRecord, currentMonth: String, currentYear: String, 
     val prevElec = room.previousElec ?: 0.0
     val prevWater = room.previousWater ?: 0.0
 
+
+    val currentElec = room.currentElec
+    val currentwater = room.currentWater
+
     val elecDiff = (newElec.toDoubleOrNull() ?: 0.0) - prevElec
     val waterDiff = (newWater.toDoubleOrNull() ?: 0.0) - prevWater
     val calculatedTotal = if (elecDiff >= 0 && waterDiff >= 0) (elecDiff * 7.0) + (waterDiff * 20.0) + 150.0 else 0.0
@@ -298,8 +305,8 @@ fun EditBillScreen(room: RoomRecord, currentMonth: String, currentYear: String, 
                     Text("มิเตอร์อ้างอิงตั้งต้น", fontWeight = FontWeight.Bold, color = Color(0xFF3F51B5))
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("ไฟ: $prevElec u.", fontSize = 14.sp)
-                        Text("น้ำ: $prevWater u.", fontSize = 14.sp)
+                        Text("ไฟ: $currentElec u.", fontSize = 14.sp)
+                        Text("น้ำ: $currentwater u.", fontSize = 14.sp)
                     }
                 }
             }
@@ -320,16 +327,20 @@ fun EditBillScreen(room: RoomRecord, currentMonth: String, currentYear: String, 
                         try {
                             val requestData = AddBillRequest(
                                 room_id = room.roomId,
+                                user_id = room.userId, // ส่งค่านี้ไปเลย (ตอน allRooms มัน Join มาให้แล้ว)
+                                owner_id = room.ownerId,
                                 bill_month = currentMonth,
                                 bill_year = currentYear,
                                 water_unit = newWater.toDoubleOrNull() ?: 0.0,
                                 electric_unit = newElec.toDoubleOrNull() ?: 0.0,
                                 total_amount = calculatedTotal,
-                                status = "pending"
+                                status = "รอตรวจสอบ"
                             )
                             RetrofitClient.instance.addBill(requestData)
                             onBack()
-                        } catch (e: Exception) { Log.e("API", "Error: ${e.message}") }
+                        } catch (e: Exception) {
+                            Log.e("API", "Error: ${e.message}")
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -348,8 +359,8 @@ fun RoomReferenceCard(
 ) {
     val hasBill = room.billMonth != null
     val displayAmount = room.lastBillAmount ?: 0.0
-    val elecUsed = if (hasBill) ((room.currentElec ?: 0.0) - (room.previousElec ?: 0.0)) else 0.0
-    val waterUsed = if (hasBill) ((room.currentWater ?: 0.0) - (room.previousWater ?: 0.0)) else 0.0
+    val elecUsed = room.currentElec
+    val waterUsed = room.currentWater
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -373,19 +384,26 @@ fun RoomReferenceCard(
                     "฿${String.format("%.2f", displayAmount)}",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (!hasBill) Color.Gray else if (room.billStatus == "pending") Color(0xFFFBC02D) else Color(0xFF3F51B5)
+                    color = if (!hasBill) Color.Gray else if (room.billStatus == "รอตรวจสอบ") Color(0xFFFBC02D) else Color(0xFF3F51B5)
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
+                // ส่วนของไฟฟ้า
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Bolt, null, tint = Color(0xFFFFB300), modifier = Modifier.size(14.dp))
-                    Text(" ไฟ: ${String.format("%.2f", if(elecUsed > 0) elecUsed else 0.0)} u.", fontSize = 12.sp)
+                    Text(
+                        text = " ไฟ: ${String.format("%.2f", elecUsed ?: 0.0)} u.",
+                        fontSize = 12.sp
+                    )
                 }
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.WaterDrop, null, tint = Color(0xFF2196F3), modifier = Modifier.size(14.dp))
-                    Text(" น้ำ: ${String.format("%.2f", if(waterUsed > 0) waterUsed else 0.0)} u.", fontSize = 12.sp)
+                    Text(
+                        text = " น้ำ: ${String.format("%.2f", waterUsed ?: 0.0)} u.",
+                        fontSize = 12.sp
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -393,9 +411,9 @@ fun RoomReferenceCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                if (room.billStatus == "pending") {
+                if (room.billStatus == "รอตรวจสอบ") {
                     Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFFFF9C4)) {
-                        Text("รอดำเนินการ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF57F17), modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                        Text("รอตรวจสอบ", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF57F17), modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                     }
                 } else if (room.billStatus == "paid" || room.billStatus == "completed") {
                     Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFE8F5E9)) {
@@ -409,14 +427,7 @@ fun RoomReferenceCard(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                if (room.billStatus == "pending") {
-                    Button(onClick = onConfirmPayment, modifier = Modifier.height(40.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 12.dp)) {
-                        Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("จ่ายแล้ว", fontSize = 12.sp)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
+
 
                 Button(onClick = onEditClick, modifier = Modifier.height(40.dp), shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 12.dp)) {
                     Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
